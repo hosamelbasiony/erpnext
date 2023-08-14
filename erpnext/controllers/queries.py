@@ -576,7 +576,9 @@ def get_income_account(doctype, txt, searchfield, start, page_len, filters):
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_filtered_dimensions(doctype, txt, searchfield, start, page_len, filters):
+def get_filtered_dimensions(
+	doctype, txt, searchfield, start, page_len, filters, reference_doctype=None
+):
 	from erpnext.accounts.doctype.accounting_dimension_filter.accounting_dimension_filter import (
 		get_dimension_filter_map,
 	)
@@ -617,7 +619,12 @@ def get_filtered_dimensions(doctype, txt, searchfield, start, page_len, filters)
 		query_filters.append(["name", query_selector, dimensions])
 
 	output = frappe.get_list(
-		doctype, fields=fields, filters=query_filters, or_filters=or_filters, as_list=1
+		doctype,
+		fields=fields,
+		filters=query_filters,
+		or_filters=or_filters,
+		as_list=1,
+		reference_doctype=reference_doctype,
 	)
 
 	return [tuple(d) for d in set(output)]
@@ -762,6 +769,15 @@ def get_purchase_invoices(doctype, txt, searchfield, start, page_len, filters):
 		)
 
 	return frappe.db.sql(query, filters)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_doctypes_for_closing(doctype, txt, searchfield, start, page_len, filters):
+	doctypes = frappe.get_hooks("period_closing_doctypes")
+	if txt:
+		doctypes = [d for d in doctypes if txt.lower() in d.lower()]
+	return [(d,) for d in set(doctypes)]
 
 
 @frappe.whitelist()
