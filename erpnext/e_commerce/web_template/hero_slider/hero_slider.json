@@ -165,7 +165,6 @@
    "fieldname": "slide_3_content_align",
    "fieldtype": "Select",
    "label": "Content Align",
-   "options": "Left\nCentre\nRight",
    "reqd": 0
   },
   {
@@ -215,7 +214,6 @@
    "fieldname": "slide_4_content_align",
    "fieldtype": "Select",
    "label": "Content Align",
-   "options": "Left\nCentre\nRight",
    "reqd": 0
   },
   {
@@ -265,7 +263,6 @@
    "fieldname": "slide_5_content_align",
    "fieldtype": "Select",
    "label": "Content Align",
-   "options": "Left\nCentre\nRight",
    "reqd": 0
   },
   {
@@ -277,7 +274,7 @@
   }
  ],
  "idx": 2,
- "modified": "2023-05-12 15:03:57.604060",
+ "modified": "2021-02-24 15:57:05.889709",
  "modified_by": "Administrator",
  "module": "E-commerce",
  "name": "Hero Slider",

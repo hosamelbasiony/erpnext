@@ -14,32 +14,21 @@ from erpnext.stock.utils import check_pending_reposting
 
 
 class AccountsSettings(Document):
+	def on_update(self):
+		frappe.clear_cache()
+
 	def validate(self):
-		old_doc = self.get_doc_before_save()
-		clear_cache = False
+		frappe.db.set_default(
+			"add_taxes_from_item_tax_template", self.get("add_taxes_from_item_tax_template", 0)
+		)
 
-		if old_doc.add_taxes_from_item_tax_template != self.add_taxes_from_item_tax_template:
-			frappe.db.set_default(
-				"add_taxes_from_item_tax_template", self.get("add_taxes_from_item_tax_template", 0)
-			)
-			clear_cache = True
-
-		if old_doc.enable_common_party_accounting != self.enable_common_party_accounting:
-			frappe.db.set_default(
-				"enable_common_party_accounting", self.get("enable_common_party_accounting", 0)
-			)
-			clear_cache = True
+		frappe.db.set_default(
+			"enable_common_party_accounting", self.get("enable_common_party_accounting", 0)
+		)
 
 		self.validate_stale_days()
-
-		if old_doc.show_payment_schedule_in_print != self.show_payment_schedule_in_print:
-			self.enable_payment_schedule_in_print()
-
-		if old_doc.acc_frozen_upto != self.acc_frozen_upto:
-			self.validate_pending_reposts()
-
-		if clear_cache:
-			frappe.clear_cache()
+		self.enable_payment_schedule_in_print()
+		self.validate_pending_reposts()
 
 	def validate_stale_days(self):
 		if not self.allow_stale and cint(self.stale_days) <= 0:

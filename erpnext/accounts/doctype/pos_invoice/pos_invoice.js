@@ -112,8 +112,7 @@ erpnext.selling.POSInvoiceController = class POSInvoiceController extends erpnex
 				party_type: "Customer",
 				account: this.frm.doc.debit_to,
 				price_list: this.frm.doc.selling_price_list,
-				pos_profile: pos_profile,
-				company_address: this.frm.doc.company_address
+				pos_profile: pos_profile
 			}, () => {
 				this.apply_pricing_rule();
 			});

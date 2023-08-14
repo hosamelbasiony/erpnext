@@ -31,7 +31,7 @@ class BOMTree:
 
 	# specifying the attributes to save resources
 	# ref: https://docs.python.org/3/reference/datamodel.html#slots
-	__slots__ = ["name", "child_items", "is_bom", "item_code", "qty", "exploded_qty", "bom_qty"]
+	__slots__ = ["name", "child_items", "is_bom", "item_code", "exploded_qty", "qty"]
 
 	def __init__(
 		self, name: str, is_bom: bool = True, exploded_qty: float = 1.0, qty: float = 1
@@ -50,10 +50,9 @@ class BOMTree:
 	def __create_tree(self):
 		bom = frappe.get_cached_doc("BOM", self.name)
 		self.item_code = bom.item
-		self.bom_qty = bom.quantity
 
 		for item in bom.get("items", []):
-			qty = item.stock_qty / bom.quantity  # quantity per unit
+			qty = item.qty / bom.quantity  # quantity per unit
 			exploded_qty = self.exploded_qty * qty
 			if item.bom_no:
 				child = BOMTree(item.bom_no, exploded_qty=exploded_qty, qty=qty)
@@ -943,8 +942,7 @@ def get_valuation_rate(data):
 	2) If no value, get last valuation rate from SLE
 	3) If no value, get valuation rate from Item
 	"""
-	from frappe.query_builder.functions import Count, IfNull, Sum
-	from pypika import Case
+	from frappe.query_builder.functions import Sum
 
 	item_code, company = data.get("item_code"), data.get("company")
 	valuation_rate = 0.0
@@ -955,14 +953,7 @@ def get_valuation_rate(data):
 		frappe.qb.from_(bin_table)
 		.join(wh_table)
 		.on(bin_table.warehouse == wh_table.name)
-		.select(
-			Case()
-			.when(
-				Count(bin_table.name) > 0, IfNull(Sum(bin_table.stock_value) / Sum(bin_table.actual_qty), 0.0)
-			)
-			.else_(None)
-			.as_("valuation_rate")
-		)
+		.select((Sum(bin_table.stock_value) / Sum(bin_table.actual_qty)).as_("valuation_rate"))
 		.where((bin_table.item_code == item_code) & (wh_table.company == company))
 	).run(as_dict=True)[0]
 
@@ -1317,7 +1308,7 @@ def item_query(doctype, txt, searchfield, start, page_len, filters):
 		if not field in searchfields
 	]
 
-	query_filters = {"disabled": 0, "ifnull(end_of_life, '3099-12-31')": (">", today())}
+	query_filters = {"disabled": 0, "end_of_life": (">", today())}
 
 	or_cond_filters = {}
 	if txt:
@@ -1339,9 +1330,8 @@ def item_query(doctype, txt, searchfield, start, page_len, filters):
 		if not has_variants:
 			query_filters["has_variants"] = 0
 
-	if filters:
-		for fieldname, value in filters.items():
-			query_filters[fieldname] = value
+	if filters and filters.get("is_stock_item"):
+		query_filters["is_stock_item"] = 1
 
 	return frappe.get_list(
 		"Item",

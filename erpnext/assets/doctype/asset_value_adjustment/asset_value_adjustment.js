@@ -49,7 +49,7 @@ frappe.ui.form.on('Asset Value Adjustment', {
 			frm.call({
 				method: "erpnext.assets.doctype.asset.asset.get_asset_value_after_depreciation",
 				args: {
-					asset_name: frm.doc.asset,
+					asset: frm.doc.asset,
 					finance_book: frm.doc.finance_book
 				},
 				callback: function(r) {

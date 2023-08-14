@@ -88,15 +88,12 @@ class BOMUpdateLog(Document):
 				boms=boms,
 				timeout=40000,
 				now=frappe.flags.in_test,
-				enqueue_after_commit=True,
 			)
 		else:
 			frappe.enqueue(
 				method="erpnext.manufacturing.doctype.bom_update_log.bom_update_log.process_boms_cost_level_wise",
-				queue="long",
 				update_doc=self,
 				now=frappe.flags.in_test,
-				enqueue_after_commit=True,
 			)
 
 
@@ -167,7 +164,7 @@ def queue_bom_cost_jobs(
 
 	while current_boms_list:
 		batch_no += 1
-		batch_size = 7_000
+		batch_size = 20_000
 		boms_to_process = current_boms_list[:batch_size]  # slice out batch of 20k BOMs
 
 		# update list to exclude 20K (queued) BOMs
@@ -215,7 +212,7 @@ def resume_bom_cost_update_jobs():
 			["name", "boms_updated", "status"],
 		)
 		incomplete_level = any(row.get("status") == "Pending" for row in bom_batches)
-		if not bom_batches or incomplete_level:
+		if not bom_batches or not incomplete_level:
 			continue
 
 		# Prep parent BOMs & updated processed BOMs for next level
@@ -255,6 +252,9 @@ def get_processed_current_boms(
 	current_boms = []
 
 	for row in bom_batches:
+		if not row.boms_updated:
+			continue
+
 		boms_updated = json.loads(row.boms_updated)
 		current_boms.extend(boms_updated)
 		boms_updated_dict = {bom: True for bom in boms_updated}

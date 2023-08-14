@@ -5,6 +5,7 @@
 import frappe
 from frappe import _
 
+from .operations import company_setup
 from .operations import install_fixtures as fixtures
 
 
@@ -34,6 +35,7 @@ def get_setup_stages(args=None):
 				"fail_msg": "Failed to set defaults",
 				"tasks": [
 					{"fn": setup_defaults, "args": args, "fail_msg": _("Failed to setup defaults")},
+					{"fn": stage_four, "args": args, "fail_msg": _("Failed to create website")},
 				],
 			},
 			{
@@ -58,6 +60,12 @@ def setup_defaults(args):
 	fixtures.install_defaults(frappe._dict(args))
 
 
+def stage_four(args):
+	company_setup.create_website(args)
+	company_setup.create_email_digest()
+	company_setup.create_logo(args)
+
+
 def fin(args):
 	frappe.local.message_log = []
 	login_as_first_user(args)
@@ -73,4 +81,5 @@ def setup_complete(args=None):
 	stage_fixtures(args)
 	setup_company(args)
 	setup_defaults(args)
+	stage_four(args)
 	fin(args)

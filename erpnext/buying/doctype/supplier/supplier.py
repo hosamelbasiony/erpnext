@@ -128,9 +128,18 @@ class Supplier(TransactionBase):
 
 	def on_trash(self):
 		if self.supplier_primary_contact:
-			self.db_set("supplier_primary_contact", None)
-		if self.supplier_primary_address:
-			self.db_set("supplier_primary_address", None)
+			frappe.db.sql(
+				"""
+				UPDATE `tabSupplier`
+				SET
+					supplier_primary_contact=null,
+					supplier_primary_address=null,
+					mobile_no=null,
+					email_id=null,
+					primary_address=null
+				WHERE name=%(name)s""",
+				{"name": self.name},
+			)
 
 		delete_contact_and_address("Supplier", self.name)
 

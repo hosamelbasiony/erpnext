@@ -50,10 +50,10 @@ class AssetValueAdjustment(Document):
 	def make_depreciation_entry(self):
 		asset = frappe.get_doc("Asset", self.asset)
 		(
-			_,
+			fixed_asset_account,
 			accumulated_depreciation_account,
 			depreciation_expense_account,
-		) = get_depreciation_accounts(asset.asset_category, asset.company)
+		) = get_depreciation_accounts(asset)
 
 		depreciation_cost_center, depreciation_series = frappe.get_cached_value(
 			"Company", asset.company, ["depreciation_cost_center", "series_for_depreciation_entry"]
@@ -116,9 +116,7 @@ class AssetValueAdjustment(Document):
 			if d.depreciation_method in ("Straight Line", "Manual"):
 				end_date = max(s.schedule_date for s in asset.schedules if cint(s.finance_book_id) == d.idx)
 				total_days = date_diff(end_date, self.date)
-				rate_per_day = flt(d.value_after_depreciation - d.expected_value_after_useful_life) / flt(
-					total_days
-				)
+				rate_per_day = flt(d.value_after_depreciation) / flt(total_days)
 				from_date = self.date
 			else:
 				no_of_depreciations = len(

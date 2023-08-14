@@ -43,7 +43,6 @@
   "column_break_33",
   "opening_accumulated_depreciation",
   "number_of_depreciations_booked",
-  "is_fully_depreciated",
   "section_break_36",
   "finance_books",
   "section_break_33",
@@ -82,9 +81,6 @@
    "options": "ACC-ASS-.YYYY.-"
   },
   {
-   "depends_on": "item_code",
-   "fetch_from": "item_code.item_name",
-   "fetch_if_empty": 1,
    "fieldname": "asset_name",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -206,7 +202,6 @@
    "fieldname": "disposal_date",
    "fieldtype": "Date",
    "label": "Disposal Date",
-   "no_copy": 1,
    "read_only": 1
   },
   {
@@ -246,17 +241,19 @@
    "label": "Is Existing Asset"
   },
   {
-   "depends_on": "eval:(doc.is_existing_asset)",
+   "depends_on": "is_existing_asset",
    "fieldname": "opening_accumulated_depreciation",
    "fieldtype": "Currency",
    "label": "Opening Accumulated Depreciation",
+   "no_copy": 1,
    "options": "Company:company:default_currency"
   },
   {
-   "depends_on": "eval:(doc.is_existing_asset)",
+   "depends_on": "eval:(doc.is_existing_asset && doc.opening_accumulated_depreciation)",
    "fieldname": "number_of_depreciations_booked",
    "fieldtype": "Int",
-   "label": "Number of Depreciations Booked"
+   "label": "Number of Depreciations Booked",
+   "no_copy": 1
   },
   {
    "collapsible": 1,
@@ -502,13 +499,6 @@
    "options": "\nSuccessful\nFailed",
    "print_hide": 1,
    "read_only": 1
-  },
-  {
-   "default": "0",
-   "depends_on": "eval:(doc.is_existing_asset)",
-   "fieldname": "is_fully_depreciated",
-   "fieldtype": "Check",
-   "label": "Is Fully Depreciated"
   }
  ],
  "idx": 72,
@@ -537,7 +527,7 @@
    "table_fieldname": "accounts"
   }
  ],
- "modified": "2023-07-28 15:47:01.137996",
+ "modified": "2023-01-25 17:45:48.649543",
  "modified_by": "Administrator",
  "module": "Assets",
  "name": "Asset",

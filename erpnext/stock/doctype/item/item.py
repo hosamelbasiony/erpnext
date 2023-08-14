@@ -350,15 +350,10 @@ class Item(Document):
 		check_list = []
 		for d in self.get("taxes"):
 			if d.item_tax_template:
-				if (d.item_tax_template, d.tax_category) in check_list:
-					frappe.throw(
-						_("{0} entered twice {1} in Item Taxes").format(
-							frappe.bold(d.item_tax_template),
-							"for tax category {0}".format(frappe.bold(d.tax_category)) if d.tax_category else "",
-						)
-					)
+				if d.item_tax_template in check_list:
+					frappe.throw(_("{0} entered twice in Item Tax").format(d.item_tax_template))
 				else:
-					check_list.append((d.item_tax_template, d.tax_category))
+					check_list.append(d.item_tax_template)
 
 	def validate_barcode(self):
 		from stdnum import ean
@@ -395,16 +390,16 @@ class Item(Document):
 
 	def validate_warehouse_for_reorder(self):
 		"""Validate Reorder level table for duplicate and conditional mandatory"""
-		warehouse_material_request_type: list[tuple[str, str]] = []
+		warehouse = []
 		for d in self.get("reorder_levels"):
 			if not d.warehouse_group:
 				d.warehouse_group = d.warehouse
-			if (d.get("warehouse"), d.get("material_request_type")) not in warehouse_material_request_type:
-				warehouse_material_request_type += [(d.get("warehouse"), d.get("material_request_type"))]
+			if d.get("warehouse") and d.get("warehouse") not in warehouse:
+				warehouse += [d.get("warehouse")]
 			else:
 				frappe.throw(
-					_("Row #{0}: A reorder entry already exists for warehouse {1} with reorder type {2}.").format(
-						d.idx, d.warehouse, d.material_request_type
+					_("Row {0}: An Reorder entry already exists for this warehouse {1}").format(
+						d.idx, d.warehouse
 					),
 					DuplicateReorderRows,
 				)
@@ -714,7 +709,6 @@ class Item(Document):
 						template=self,
 						now=frappe.flags.in_test,
 						timeout=600,
-						enqueue_after_commit=True,
 					)
 
 	def validate_has_variants(self):

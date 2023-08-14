@@ -9,25 +9,19 @@ frappe.ui.form.on('Production Plan', {
 			item.temporary_name = item.name;
 		});
 	},
-
 	setup(frm) {
-		frm.trigger("setup_queries");
-
 		frm.custom_make_buttons = {
 			'Work Order': 'Work Order / Subcontract PO',
 			'Material Request': 'Material Request',
 		};
-	},
 
-	setup_queries(frm) {
-		frm.set_query("sales_order", "sales_orders", () => {
+		frm.fields_dict['po_items'].grid.get_field('warehouse').get_query = function(doc) {
 			return {
-				query: "erpnext.manufacturing.doctype.production_plan.production_plan.sales_order_query",
 				filters: {
-					company: frm.doc.company,
+					company: doc.company
 				}
 			}
-		});
+		}
 
 		frm.set_query('for_warehouse', function(doc) {
 			return {
@@ -48,40 +42,32 @@ frappe.ui.form.on('Production Plan', {
 			};
 		});
 
-		frm.set_query("item_code", "po_items", (doc, cdt, cdn) => {
+		frm.fields_dict['po_items'].grid.get_field('item_code').get_query = function(doc) {
 			return {
 				query: "erpnext.controllers.queries.item_query",
 				filters:{
 					'is_stock_item': 1,
 				}
 			}
-		});
+		}
 
-		frm.set_query("bom_no", "po_items", (doc, cdt, cdn) => {
+		frm.fields_dict['po_items'].grid.get_field('bom_no').get_query = function(doc, cdt, cdn) {
 			var d = locals[cdt][cdn];
 			if (d.item_code) {
 				return {
 					query: "erpnext.controllers.queries.bom",
-					filters:{'item': d.item_code, 'docstatus': 1}
+					filters:{'item': cstr(d.item_code), 'docstatus': 1}
 				}
 			} else frappe.msgprint(__("Please enter Item first"));
-		});
+		}
 
-		frm.set_query("warehouse", "mr_items", (doc) => {
+		frm.fields_dict['mr_items'].grid.get_field('warehouse').get_query = function(doc) {
 			return {
 				filters: {
 					company: doc.company
 				}
 			}
-		});
-
-		frm.set_query("warehouse", "po_items", (doc) => {
-			return {
-				filters: {
-					company: doc.company
-				}
-			}
-		});
+		}
 	},
 
 	refresh(frm) {
@@ -113,7 +99,7 @@ frappe.ui.form.on('Production Plan', {
 					}, __('Create'));
 				}
 
-				if (frm.doc.mr_items && frm.doc.mr_items.length && !in_list(['Material Requested', 'Closed'], frm.doc.status)) {
+				if (frm.doc.mr_items && !in_list(['Material Requested', 'Closed'], frm.doc.status)) {
 					frm.add_custom_button(__("Material Request"), ()=> {
 						frm.trigger("make_material_request");
 					}, __('Create'));
@@ -350,6 +336,10 @@ frappe.ui.form.on('Production Plan', {
 	},
 
 	get_items_for_material_requests(frm, warehouses) {
+		let set_fields = ['actual_qty', 'item_code','item_name', 'description', 'uom', 'from_warehouse',
+			'min_order_qty', 'required_bom_qty', 'quantity', 'sales_order', 'warehouse', 'projected_qty', 'ordered_qty',
+			'reserved_qty_for_production', 'material_request_type'];
+
 		frappe.call({
 			method: "erpnext.manufacturing.doctype.production_plan.production_plan.get_items_for_material_requests",
 			freeze: true,
@@ -362,11 +352,11 @@ frappe.ui.form.on('Production Plan', {
 					frm.set_value('mr_items', []);
 					r.message.forEach(row => {
 						let d = frm.add_child('mr_items');
-						for (let field in row) {
-							if (field !== 'name') {
+						set_fields.forEach(field => {
+							if (row[field]) {
 								d[field] = row[field];
 							}
-						}
+						});
 					});
 				}
 				refresh_field('mr_items');
@@ -450,7 +440,7 @@ frappe.ui.form.on("Production Plan Item", {
 				}
 			});
 		}
-	},
+	}
 });
 
 frappe.ui.form.on("Material Request Plan Item", {
@@ -465,14 +455,10 @@ frappe.ui.form.on("Material Request Plan Item", {
 					for_warehouse: row.warehouse
 				},
 				callback: function(r) {
-					if (r.message) {
-						let {projected_qty, actual_qty} = r.message[0];
+					let {projected_qty, actual_qty} = r.message;
 
-						frappe.model.set_value(cdt, cdn, {
-							'projected_qty': projected_qty,
-							'actual_qty': actual_qty
-						});
-					}
+					frappe.model.set_value(cdt, cdn, 'projected_qty', projected_qty);
+					frappe.model.set_value(cdt, cdn, 'actual_qty', actual_qty);
 				}
 			})
 		}
@@ -481,35 +467,30 @@ frappe.ui.form.on("Material Request Plan Item", {
 
 frappe.ui.form.on("Production Plan Sales Order", {
 	sales_order(frm, cdt, cdn) {
-		let row = locals[cdt][cdn];
-		const sales_order = row.sales_order;
+		const { sales_order } = locals[cdt][cdn];
 		if (!sales_order) {
 			return;
 		}
-
-		if (row.sales_order) {
-			frm.call({
-				method: "validate_sales_orders",
-				doc: frm.doc,
-				args: {
-					sales_order: row.sales_order,
-				},
-				callback(r) {
-					frappe.call({
-						method: "erpnext.manufacturing.doctype.production_plan.production_plan.get_so_details",
-						args: { sales_order },
-						callback(r) {
-							const {transaction_date, customer, grand_total} = r.message;
-							frappe.model.set_value(cdt, cdn, 'sales_order_date', transaction_date);
-							frappe.model.set_value(cdt, cdn, 'customer', customer);
-							frappe.model.set_value(cdt, cdn, 'grand_total', grand_total);
-						}
-					});
-				}
-			});
-		}
+		frappe.call({
+			method: "erpnext.manufacturing.doctype.production_plan.production_plan.get_so_details",
+			args: { sales_order },
+			callback(r) {
+				const {transaction_date, customer, grand_total} = r.message;
+				frappe.model.set_value(cdt, cdn, 'sales_order_date', transaction_date);
+				frappe.model.set_value(cdt, cdn, 'customer', customer);
+				frappe.model.set_value(cdt, cdn, 'grand_total', grand_total);
+			}
+		});
 	}
 });
+
+cur_frm.fields_dict['sales_orders'].grid.get_field("sales_order").get_query = function() {
+	return{
+		filters: [
+			['Sales Order','docstatus', '=' ,1]
+		]
+	}
+};
 
 frappe.tour['Production Plan'] = [
 	{

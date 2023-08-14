@@ -264,7 +264,7 @@ erpnext.selling.SalesOrderController = class SalesOrderController extends erpnex
 					}
 				}
 				// payment request
-				if(flt(doc.per_billed, precision('per_billed', doc)) < 100 + frappe.boot.sysdefaults.over_billing_allowance) {
+				if(flt(doc.per_billed)<100) {
 					this.frm.add_custom_button(__('Payment Request'), () => this.make_payment_request(), __('Create'));
 					this.frm.add_custom_button(__('Payment'), () => this.make_payment_entry(), __('Create'));
 				}
@@ -275,7 +275,7 @@ erpnext.selling.SalesOrderController = class SalesOrderController extends erpnex
 		if (this.frm.doc.docstatus===0) {
 			this.frm.add_custom_button(__('Quotation'),
 				function() {
-					let d = erpnext.utils.map_current_doc({
+					erpnext.utils.map_current_doc({
 						method: "erpnext.selling.doctype.quotation.quotation.make_sales_order",
 						source_doctype: "Quotation",
 						target: me.frm,
@@ -293,16 +293,7 @@ erpnext.selling.SalesOrderController = class SalesOrderController extends erpnex
 							docstatus: 1,
 							status: ["!=", "Lost"]
 						}
-					});
-
-					setTimeout(() => {
-						d.$parent.append(`
-							<span class='small text-muted'>
-								${__("Note: Please create Sales Orders from individual Quotations to select from among Alternative Items.")}
-							</span>
-					`);
-					}, 200);
-
+					})
 				}, __("Get Items From"));
 		}
 

@@ -121,8 +121,8 @@ class MaterialRequest(BuyingController):
 			self.title = _("{0} Request for {1}").format(self.material_request_type, items)[:100]
 
 	def on_submit(self):
-		self.update_requested_qty_in_production_plan()
 		self.update_requested_qty()
+		self.update_requested_qty_in_production_plan()
 		if self.material_request_type == "Purchase":
 			self.validate_budget()
 
@@ -181,8 +181,8 @@ class MaterialRequest(BuyingController):
 				)
 
 	def on_cancel(self):
-		self.update_requested_qty_in_production_plan()
 		self.update_requested_qty()
+		self.update_requested_qty_in_production_plan()
 
 	def get_mr_items_ordered_qty(self, mr_items):
 		mr_items_ordered_qty = {}
@@ -223,14 +223,12 @@ class MaterialRequest(BuyingController):
 		mr_qty_allowance = frappe.db.get_single_value("Stock Settings", "mr_qty_allowance")
 
 		for d in self.get("items"):
-			precision = d.precision("ordered_qty")
 			if d.name in mr_items:
 				if self.material_request_type in ("Material Issue", "Material Transfer", "Customer Provided"):
 					d.ordered_qty = flt(mr_items_ordered_qty.get(d.name))
 
 					if mr_qty_allowance:
-						allowed_qty = flt((d.qty + (d.qty * (mr_qty_allowance / 100))), precision)
-
+						allowed_qty = d.qty + (d.qty * (mr_qty_allowance / 100))
 						if d.ordered_qty and d.ordered_qty > allowed_qty:
 							frappe.throw(
 								_(
@@ -238,11 +236,11 @@ class MaterialRequest(BuyingController):
 								).format(d.ordered_qty, d.parent, allowed_qty, d.item_code)
 							)
 
-					elif d.ordered_qty and flt(d.ordered_qty, precision) > flt(d.stock_qty, precision):
+					elif d.ordered_qty and d.ordered_qty > d.stock_qty:
 						frappe.throw(
 							_(
 								"The total Issue / Transfer quantity {0} in Material Request {1} cannot be greater than requested quantity {2} for Item {3}"
-							).format(d.ordered_qty, d.parent, d.stock_qty, d.item_code)
+							).format(d.ordered_qty, d.parent, d.qty, d.item_code)
 						)
 
 				elif self.material_request_type == "Manufacture":
@@ -275,13 +273,7 @@ class MaterialRequest(BuyingController):
 				item_wh_list.append([d.item_code, d.warehouse])
 
 		for item_code, warehouse in item_wh_list:
-			update_bin_qty(
-				item_code,
-				warehouse,
-				{
-					"indented_qty": get_indented_qty(item_code, warehouse),
-				},
-			)
+			update_bin_qty(item_code, warehouse, {"indented_qty": get_indented_qty(item_code, warehouse)})
 
 	def update_requested_qty_in_production_plan(self):
 		production_plans = []
@@ -627,18 +619,8 @@ def make_stock_entry(source_name, target_doc=None):
 		target.set_transfer_qty()
 		target.set_actual_qty()
 		target.calculate_rate_and_amount(raise_error_if_no_rate=False)
-		target.stock_entry_type = target.purpose
+		target.set_stock_entry_type()
 		target.set_job_card_data()
-
-		if source.job_card:
-			job_card_details = frappe.get_all(
-				"Job Card", filters={"name": source.job_card}, fields=["bom_no", "for_quantity"]
-			)
-
-			if job_card_details and job_card_details[0]:
-				target.bom_no = job_card_details[0].bom_no
-				target.fg_completed_qty = job_card_details[0].for_quantity
-				target.from_bom = 1
 
 	doclist = get_mapped_doc(
 		"Material Request",

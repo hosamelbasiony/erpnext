@@ -25,7 +25,6 @@ def get_data(filters):
 		["posting_date", "<=", filters.get("to_date")],
 		["against_voucher_type", "=", "Asset"],
 		["account", "in", depreciation_accounts],
-		["is_cancelled", "=", 0],
 	]
 
 	if filters.get("asset"):

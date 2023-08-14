@@ -75,6 +75,7 @@ webform_list_context = "erpnext.controllers.website_list_for_contact.get_webform
 calendars = [
 	"Task",
 	"Work Order",
+	"Leave Application",
 	"Sales Order",
 	"Holiday List",
 ]
@@ -275,36 +276,12 @@ has_website_permission = {
 before_tests = "erpnext.setup.utils.before_tests"
 
 standard_queries = {
-	"Customer": "erpnext.controllers.queries.customer_query",
+	"Customer": "erpnext.selling.doctype.customer.customer.get_customer_list",
 }
-
-period_closing_doctypes = [
-	"Sales Invoice",
-	"Purchase Invoice",
-	"Journal Entry",
-	"Bank Clearance",
-	"Stock Entry",
-	"Dunning",
-	"Invoice Discounting",
-	"Payment Entry",
-	"Period Closing Voucher",
-	"Process Deferred Accounting",
-	"Asset",
-	"Asset Capitalization",
-	"Asset Repair",
-	"Delivery Note",
-	"Landed Cost Voucher",
-	"Purchase Receipt",
-	"Stock Reconciliation",
-	"Subcontracting Receipt",
-]
 
 doc_events = {
 	"*": {
 		"validate": "erpnext.support.doctype.service_level_agreement.service_level_agreement.apply",
-	},
-	tuple(period_closing_doctypes): {
-		"validate": "erpnext.accounts.doctype.accounting_period.accounting_period.validate_accounting_period_on_doc_save",
 	},
 	"Stock Entry": {
 		"on_submit": "erpnext.stock.doctype.material_request.material_request.update_completed_and_requested_qty",
@@ -382,11 +359,6 @@ doc_events = {
 	},
 }
 
-# function should expect the variable and doc as arguments
-naming_series_variables = {
-	"FY": "erpnext.accounts.utils.parse_naming_series_variable",
-}
-
 # On cancel event Payment Entry will be exempted and all linked submittable doctype will get cancelled.
 # to maintain data integrity we exempted payment entry. it will un-link when sales invoice get cancelled.
 # if payment entry not in auto cancel exempted doctypes it will cancel payment entry.
@@ -398,7 +370,6 @@ scheduler_events = {
 	"cron": {
 		"0/15 * * * *": [
 			"erpnext.manufacturing.doctype.bom_update_log.bom_update_log.resume_bom_cost_update_jobs",
-			"erpnext.accounts.doctype.process_payment_reconciliation.process_payment_reconciliation.trigger_reconciliation_for_queued_docs",
 		],
 		"0/30 * * * *": [
 			"erpnext.utilities.doctype.video.video.update_youtube_data",
@@ -413,11 +384,11 @@ scheduler_events = {
 		],
 	},
 	"all": [
+		"erpnext.projects.doctype.project.project.project_status_update_reminder",
 		"erpnext.crm.doctype.social_media_post.social_media_post.process_scheduled_social_media_posts",
 	],
 	"hourly": [
 		"erpnext.erpnext_integrations.doctype.plaid_settings.plaid_settings.automatic_synchronization",
-		"erpnext.projects.doctype.project.project.project_status_update_reminder",
 		"erpnext.projects.doctype.project.project.hourly_reminder",
 		"erpnext.projects.doctype.project.project.collect_project_status",
 	],
@@ -432,6 +403,7 @@ scheduler_events = {
 		"erpnext.controllers.accounts_controller.update_invoice_status",
 		"erpnext.accounts.doctype.fiscal_year.fiscal_year.auto_create_fiscal_year",
 		"erpnext.projects.doctype.task.task.set_tasks_as_overdue",
+		"erpnext.assets.doctype.asset.depreciation.post_depreciation_entries",
 		"erpnext.stock.doctype.serial_no.serial_no.update_maintenance_status",
 		"erpnext.buying.doctype.supplier_scorecard.supplier_scorecard.refresh_scorecards",
 		"erpnext.setup.doctype.company.company.cache_companies_monthly_sales_history",
@@ -447,10 +419,6 @@ scheduler_events = {
 		"erpnext.selling.doctype.quotation.quotation.set_expired_status",
 		"erpnext.buying.doctype.supplier_quotation.supplier_quotation.set_expired_status",
 		"erpnext.accounts.doctype.process_statement_of_accounts.process_statement_of_accounts.send_auto_email",
-		"erpnext.accounts.utils.auto_create_exchange_rate_revaluation_daily",
-	],
-	"weekly": [
-		"erpnext.accounts.utils.auto_create_exchange_rate_revaluation_weekly",
 	],
 	"daily_long": [
 		"erpnext.setup.doctype.email_digest.email_digest.send",
@@ -458,7 +426,6 @@ scheduler_events = {
 		"erpnext.loan_management.doctype.process_loan_security_shortfall.process_loan_security_shortfall.create_process_loan_security_shortfall",
 		"erpnext.loan_management.doctype.process_loan_interest_accrual.process_loan_interest_accrual.process_loan_interest_accrual_for_term_loans",
 		"erpnext.crm.utils.open_leads_opportunities_based_on_todays_event",
-		"erpnext.assets.doctype.asset.depreciation.post_depreciation_entries",
 	],
 	"monthly_long": [
 		"erpnext.accounts.deferred_revenue.process_deferred_accounting",
@@ -494,6 +461,15 @@ communication_doctypes = ["Customer", "Supplier"]
 advance_payment_doctypes = ["Sales Order", "Purchase Order"]
 
 invoice_doctypes = ["Sales Invoice", "Purchase Invoice"]
+
+period_closing_doctypes = [
+	"Sales Invoice",
+	"Purchase Invoice",
+	"Journal Entry",
+	"Bank Clearance",
+	"Asset",
+	"Stock Entry",
+]
 
 bank_reconciliation_doctypes = [
 	"Payment Entry",
@@ -546,7 +522,6 @@ accounting_dimension_doctypes = [
 	"Subcontracting Order Item",
 	"Subcontracting Receipt",
 	"Subcontracting Receipt Item",
-	"Account Closing Balance",
 ]
 
 # get matching queries for Bank Reconciliation
@@ -631,8 +606,3 @@ global_search_doctypes = {
 additional_timeline_content = {
 	"*": ["erpnext.telephony.doctype.call_log.call_log.get_linked_call_logs"]
 }
-
-
-extend_bootinfo = [
-	"erpnext.support.doctype.service_level_agreement.service_level_agreement.add_sla_doctypes",
-]

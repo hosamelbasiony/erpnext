@@ -21,9 +21,6 @@ from erpnext.accounts.doctype.sales_invoice.sales_invoice import (
 )
 from erpnext.accounts.party import get_party_account
 from erpnext.controllers.selling_controller import SellingController
-from erpnext.manufacturing.doctype.blanket_order.blanket_order import (
-	validate_against_blanket_order,
-)
 from erpnext.manufacturing.doctype.production_plan.production_plan import (
 	get_items_for_material_requests,
 )
@@ -55,7 +52,6 @@ class SalesOrder(SellingController):
 		self.validate_warehouse()
 		self.validate_drop_ship()
 		self.validate_serial_no_based_delivery()
-		validate_against_blanket_order(self)
 		validate_inter_company_party(
 			self.doctype, self.customer, self.company, self.inter_company_order_reference
 		)
@@ -158,8 +154,7 @@ class SalesOrder(SellingController):
 						frappe.msgprint(
 							_("Expected Delivery Date should be after Sales Order Date"),
 							indicator="orange",
-							title=_("Invalid Delivery Date"),
-							raise_exception=True,
+							title=_("Warning"),
 						)
 			else:
 				frappe.throw(_("Please enter Delivery Date"))
@@ -218,7 +213,6 @@ class SalesOrder(SellingController):
 					frappe.throw(_("Quotation {0} is cancelled").format(quotation))
 
 				doc.set_status(update=True)
-				doc.update_opportunity("Converted" if flag == "submit" else "Quotation")
 
 	def validate_drop_ship(self):
 		for d in self.get("items"):
@@ -400,17 +394,10 @@ class SalesOrder(SellingController):
 	def update_picking_status(self):
 		total_picked_qty = 0.0
 		total_qty = 0.0
-		per_picked = 0.0
-
 		for so_item in self.items:
-			if cint(
-				frappe.get_cached_value("Item", so_item.item_code, "is_stock_item")
-			) or self.has_product_bundle(so_item.item_code):
-				total_picked_qty += flt(so_item.picked_qty)
-				total_qty += flt(so_item.stock_qty)
-
-		if total_picked_qty and total_qty:
-			per_picked = total_picked_qty / total_qty * 100
+			total_picked_qty += flt(so_item.picked_qty)
+			total_qty += flt(so_item.stock_qty)
+		per_picked = total_picked_qty / total_qty * 100
 
 		self.db_set("per_picked", flt(per_picked), update_modified=False)
 
@@ -556,7 +543,7 @@ def make_material_request(source_name, target_doc=None):
 		# qty is for packed items, because packed items don't have stock_qty field
 		qty = source.get("qty")
 		target.project = source_parent.project
-		target.qty = qty - requested_item_qty.get(source.name, 0) - flt(source.get("delivered_qty"))
+		target.qty = qty - requested_item_qty.get(source.name, 0)
 		target.stock_qty = flt(target.qty) * flt(target.conversion_factor)
 
 		args = target.as_dict().copy()
@@ -590,7 +577,7 @@ def make_material_request(source_name, target_doc=None):
 				"doctype": "Material Request Item",
 				"field_map": {"name": "sales_order_item", "parent": "sales_order"},
 				"condition": lambda doc: not frappe.db.exists("Product Bundle", doc.item_code)
-				and (doc.stock_qty - flt(doc.get("delivered_qty"))) > requested_item_qty.get(doc.name, 0),
+				and doc.stock_qty > requested_item_qty.get(doc.name, 0),
 				"postprocess": update_item,
 			},
 		},
@@ -629,8 +616,6 @@ def make_project(source_name, target_doc=None):
 
 @frappe.whitelist()
 def make_delivery_note(source_name, target_doc=None, skip_item_mapping=False):
-	from erpnext.stock.doctype.packed_item.packed_item import make_packing_list
-
 	def set_missing_values(source, target):
 		target.run_method("set_missing_values")
 		target.run_method("set_po_nos")
@@ -644,8 +629,6 @@ def make_delivery_note(source_name, target_doc=None, skip_item_mapping=False):
 
 		if target.company_address:
 			target.update(get_fetch_values("Delivery Note", "company_address", target.company_address))
-
-		make_packing_list(target)
 
 	def update_item(source, target, source_parent):
 		target.base_amount = (flt(source.qty) - flt(source.delivered_qty)) * flt(source.base_rate)
@@ -1353,9 +1336,8 @@ def get_work_order_items(sales_order, for_raw_material_request=0):
 						.select(Sum(wo.qty))
 						.where(
 							(wo.production_item == i.item_code)
-							& (wo.sales_order == so.name)
-							& (wo.sales_order_item == i.name)
-							& (wo.docstatus.lt(2))
+							& (wo.sales_order == so.name) * (wo.sales_order_item == i.name)
+							& (wo.docstatus.lte(2))
 						)
 						.run()[0][0]
 					)

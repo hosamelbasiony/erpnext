@@ -16,7 +16,7 @@ frappe.query_reports["Fichier des Ecritures Comptables [FEC]"] = {
 			"label": __("Fiscal Year"),
 			"fieldtype": "Link",
 			"options": "Fiscal Year",
-			"default": erpnext.utils.get_fiscal_year(frappe.datetime.get_today()),
+			"default": frappe.defaults.get_user_default("fiscal_year"),
 			"reqd": 1
 		}
 	],

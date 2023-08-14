@@ -53,7 +53,6 @@ def get_tabs(categories):
 
 def get_category_records(categories: list):
 	categorical_data = {}
-	website_item_meta = frappe.get_meta("Website Item", cached=True)
 
 	for c in categories:
 		if c == "item_group":
@@ -65,16 +64,7 @@ def get_category_records(categories: list):
 
 			continue
 
-		field_type = website_item_meta.get_field(c).fieldtype
-
-		if field_type == "Table MultiSelect":
-			child_doc = website_item_meta.get_field(c).options
-			for field in frappe.get_meta(child_doc, cached=True).fields:
-				if field.fieldtype == "Link" and field.reqd:
-					doctype = field.options
-		else:
-			doctype = website_item_meta.get_field(c).options
-
+		doctype = frappe.unscrub(c)
 		fields = ["name"]
 
 		try:

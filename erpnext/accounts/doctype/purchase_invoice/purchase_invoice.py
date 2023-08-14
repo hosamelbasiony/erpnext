@@ -117,7 +117,7 @@ class PurchaseInvoice(BuyingController):
 		self.validate_expense_account()
 		self.set_against_expense_account()
 		self.validate_write_off_account()
-		self.validate_multiple_billing("Purchase Receipt", "pr_detail", "amount")
+		self.validate_multiple_billing("Purchase Receipt", "pr_detail", "amount", "items")
 		self.create_remarks()
 		self.set_status()
 		self.validate_purchase_receipt_if_update_stock()
@@ -581,7 +581,6 @@ class PurchaseInvoice(BuyingController):
 
 		self.make_supplier_gl_entry(gl_entries)
 		self.make_item_gl_entries(gl_entries)
-		self.make_precision_loss_gl_entry(gl_entries)
 
 		if self.check_asset_cwip_enabled():
 			self.get_asset_gl_entry(gl_entries)
@@ -1364,7 +1363,7 @@ class PurchaseInvoice(BuyingController):
 			not self.is_internal_transfer() and self.rounding_adjustment and self.base_rounding_adjustment
 		):
 			round_off_account, round_off_cost_center = get_round_off_account_and_cost_center(
-				self.company, "Purchase Invoice", self.name, self.use_company_roundoff_cost_center
+				self.company, "Purchase Invoice", self.name
 			)
 
 			gl_entries.append(
@@ -1374,9 +1373,7 @@ class PurchaseInvoice(BuyingController):
 						"against": self.supplier,
 						"debit_in_account_currency": self.rounding_adjustment,
 						"debit": self.base_rounding_adjustment,
-						"cost_center": round_off_cost_center
-						if self.use_company_roundoff_cost_center
-						else (self.cost_center or round_off_cost_center),
+						"cost_center": self.cost_center or round_off_cost_center,
 					},
 					item=self,
 				)

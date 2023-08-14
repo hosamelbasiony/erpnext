@@ -236,11 +236,7 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 							this.make_purchase_invoice, __('Create'));
 
 					if(flt(doc.per_billed) < 100 && doc.status != "Delivered") {
-						this.frm.add_custom_button(
-							__('Payment'),
-							() => this.make_payment_entry(),
-							__('Create')
-						);
+						cur_frm.add_custom_button(__('Payment'), cur_frm.cscript.make_payment_entry, __('Create'));
 					}
 
 					if(flt(doc.per_billed) < 100) {
@@ -286,7 +282,7 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 			source_name: this.frm.doc.supplier,
 			target: this.frm,
 			setters: {
-				company: this.frm.doc.company
+				company: me.frm.doc.company
 			},
 			get_query_filters: {
 				docstatus: ["!=", 2],
@@ -369,7 +365,7 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 					},
 					allow_child_item_selection: true,
 					child_fieldname: "items",
-					child_columns: ["item_code", "qty", "ordered_qty"]
+					child_columns: ["item_code", "qty"]
 				})
 			}, __("Get Items From"));
 

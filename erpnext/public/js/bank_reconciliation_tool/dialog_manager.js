@@ -20,7 +20,7 @@ erpnext.accounts.bank_reconciliation.DialogManager = class DialogManager {
 				doctype: "Bank Transaction",
 				filters: { name: this.bank_transaction_name },
 				fieldname: [
-					"date",
+					"date as reference_date",
 					"deposit",
 					"withdrawal",
 					"currency",
@@ -33,7 +33,6 @@ erpnext.accounts.bank_reconciliation.DialogManager = class DialogManager {
 					"party",
 					"unallocated_amount",
 					"allocated_amount",
-					"transaction_type",
 				],
 			},
 			callback: (r) => {
@@ -42,23 +41,11 @@ erpnext.accounts.bank_reconciliation.DialogManager = class DialogManager {
 					r.message.payment_entry = 1;
 					r.message.journal_entry = 1;
 					this.dialog.set_values(r.message);
-					this.copy_data_to_voucher();
 					this.dialog.show();
 				}
 			},
 		});
 	}
-
-	copy_data_to_voucher() {
-		let copied = {
-			reference_number: this.bank_transaction.reference_number || this.bank_transaction.description,
-			posting_date: this.bank_transaction.date,
-			reference_date: this.bank_transaction.date,
-			mode_of_payment: this.bank_transaction.transaction_type,
-		};
-		this.dialog.set_values(copied);
-	}
-
 	get_linked_vouchers(document_types) {
 		frappe.call({
 			method:
@@ -88,9 +75,10 @@ erpnext.accounts.bank_reconciliation.DialogManager = class DialogManager {
 							row[1],
 							row[2],
 							reference_date,
+							row[8],
 							format_currency(row[3], row[9]),
-							row[4],
 							row[6],
+							row[4],
 						]);
 					});
 					this.get_dt_columns();
@@ -116,7 +104,7 @@ erpnext.accounts.bank_reconciliation.DialogManager = class DialogManager {
 			{
 				name: __("Document Name"),
 				editable: false,
-				width: 1,
+				width: 150,
 			},
 			{
 				name: __("Reference Date"),
@@ -124,19 +112,25 @@ erpnext.accounts.bank_reconciliation.DialogManager = class DialogManager {
 				width: 120,
 			},
 			{
-				name: __("Remaining"),
+				name: "Posting Date",
 				editable: false,
-				width: 100,
+				width: 120,
 			},
 			{
-				name: __("Reference Number"),
+				name: __("Amount"),
 				editable: false,
-				width: 200,
+				width: 100,
 			},
 			{
 				name: __("Party"),
 				editable: false,
-				width: 100,
+				width: 120,
+			},
+
+			{
+				name: __("Reference Number"),
+				editable: false,
+				width: 140,
 			},
 		];
 	}
@@ -231,16 +225,6 @@ erpnext.accounts.bank_reconciliation.DialogManager = class DialogManager {
 				onchange: () => this.update_options(),
 			},
 			{
-				fieldname: "column_break_5",
-				fieldtype: "Column Break",
-			},
-			{
-				fieldtype: "Check",
-				label: "Bank Transaction",
-				fieldname: "bank_transaction",
-				onchange: () => this.update_options(),
-			},
-			{
 				fieldtype: "Section Break",
 				fieldname: "section_break_1",
 				label: __("Select Vouchers to Match"),
@@ -305,7 +289,7 @@ erpnext.accounts.bank_reconciliation.DialogManager = class DialogManager {
 				fieldtype: "Column Break",
 			},
 			{
-				default: "Bank Entry",
+				default: "Journal Entry Type",
 				fieldname: "journal_entry_type",
 				fieldtype: "Select",
 				label: "Journal Entry Type",
@@ -380,30 +364,20 @@ erpnext.accounts.bank_reconciliation.DialogManager = class DialogManager {
 				fieldtype: "Section Break",
 				fieldname: "details_section",
 				label: "Transaction Details",
-			},
-			{
-				fieldname: "date",
-				fieldtype: "Date",
-				label: "Date",
-				read_only: 1,
+				collapsible: 1,
 			},
 			{
 				fieldname: "deposit",
 				fieldtype: "Currency",
 				label: "Deposit",
-				options: "account_currency",
+				options: "currency",
 				read_only: 1,
 			},
 			{
 				fieldname: "withdrawal",
 				fieldtype: "Currency",
 				label: "Withdrawal",
-				options: "account_currency",
-				read_only: 1,
-			},
-			{
-				fieldname: "column_break_17",
-				fieldtype: "Column Break",
+				options: "currency",
 				read_only: 1,
 			},
 			{
@@ -413,21 +387,27 @@ erpnext.accounts.bank_reconciliation.DialogManager = class DialogManager {
 				read_only: 1,
 			},
 			{
+				fieldname: "column_break_17",
+				fieldtype: "Column Break",
+				read_only: 1,
+			},
+			{
 				fieldname: "allocated_amount",
 				fieldtype: "Currency",
 				label: "Allocated Amount",
-				options: "account_currency",
+				options: "Currency",
 				read_only: 1,
 			},
+
 			{
 				fieldname: "unallocated_amount",
 				fieldtype: "Currency",
 				label: "Unallocated Amount",
-				options: "account_currency",
+				options: "Currency",
 				read_only: 1,
 			},
 			{
-				fieldname: "account_currency",
+				fieldname: "currency",
 				fieldtype: "Link",
 				label: "Currency",
 				options: "Currency",

@@ -122,10 +122,13 @@ frappe.ui.form.on('Payment Entry', {
 		frm.set_query('payment_term', 'references', function(frm, cdt, cdn) {
 			const child = locals[cdt][cdn];
 			if (in_list(['Purchase Invoice', 'Sales Invoice'], child.reference_doctype) && child.reference_name) {
+				let payment_term_list = frappe.get_list('Payment Schedule', {'parent': child.reference_name});
+
+				payment_term_list = payment_term_list.map(pt => pt.payment_term);
+
 				return {
-					query: "erpnext.controllers.queries.get_payment_terms_for_references",
 					filters: {
-						'reference': child.reference_name
+						'name': ['in', payment_term_list]
 					}
 				}
 			}
@@ -241,6 +244,8 @@ frappe.ui.form.on('Payment Entry', {
 
 		frm.set_currency_labels(["total_amount", "outstanding_amount", "allocated_amount"],
 			party_account_currency, "references");
+
+		frm.set_currency_labels(["amount"], company_currency, "deductions");
 
 		cur_frm.set_df_property("source_exchange_rate", "description",
 			("1 " + frm.doc.paid_from_account_currency + " = [?] " + company_currency));
@@ -610,7 +615,7 @@ frappe.ui.form.on('Payment Entry', {
 			frm.events.set_unallocated_amount(frm);
 	},
 
-	get_outstanding_invoices_or_orders: function(frm, get_outstanding_invoices, get_orders_to_be_billed) {
+	get_outstanding_invoice: function(frm) {
 		const today = frappe.datetime.get_today();
 		const fields = [
 			{fieldtype:"Section Break", label: __("Posting Date")},
@@ -640,29 +645,12 @@ frappe.ui.form.on('Payment Entry', {
 			{fieldtype:"Check", label: __("Allocate Payment Amount"), fieldname:"allocate_payment_amount", default:1},
 		];
 
-		let btn_text = "";
-
-		if (get_outstanding_invoices) {
-			btn_text = "Get Outstanding Invoices";
-		}
-		else if (get_orders_to_be_billed) {
-			btn_text = "Get Outstanding Orders";
-		}
-
 		frappe.prompt(fields, function(filters){
 			frappe.flags.allocate_payment_amount = true;
 			frm.events.validate_filters_data(frm, filters);
 			frm.doc.cost_center = filters.cost_center;
-			frm.events.get_outstanding_documents(frm, filters, get_outstanding_invoices, get_orders_to_be_billed);
-		}, __("Filters"), __(btn_text));
-	},
-
-	get_outstanding_invoices: function(frm) {
-		frm.events.get_outstanding_invoices_or_orders(frm, true, false);
-	},
-
-	get_outstanding_orders: function(frm) {
-		frm.events.get_outstanding_invoices_or_orders(frm, false, true);
+			frm.events.get_outstanding_documents(frm, filters);
+		}, __("Filters"), __("Get Outstanding Documents"));
 	},
 
 	validate_filters_data: function(frm, filters) {
@@ -688,7 +676,7 @@ frappe.ui.form.on('Payment Entry', {
 		}
 	},
 
-	get_outstanding_documents: function(frm, filters, get_outstanding_invoices, get_orders_to_be_billed) {
+	get_outstanding_documents: function(frm, filters) {
 		frm.clear_table("references");
 
 		if(!frm.doc.party) {
@@ -710,13 +698,6 @@ frappe.ui.form.on('Payment Entry', {
 
 		for (let key in filters) {
 			args[key] = filters[key];
-		}
-
-		if (get_outstanding_invoices) {
-			args["get_outstanding_invoices"] = true;
-		}
-		else if (get_orders_to_be_billed) {
-			args["get_orders_to_be_billed"] = true;
 		}
 
 		frappe.flags.allocate_payment_amount = filters['allocate_payment_amount'];
@@ -894,12 +875,12 @@ frappe.ui.form.on('Payment Entry', {
 			if(frm.doc.payment_type == "Receive"
 				&& frm.doc.base_total_allocated_amount < frm.doc.base_received_amount + total_deductions
 				&& frm.doc.total_allocated_amount < frm.doc.paid_amount + (total_deductions / frm.doc.source_exchange_rate)) {
-					unallocated_amount = (frm.doc.base_received_amount + total_deductions + flt(frm.doc.base_total_taxes_and_charges)
+					unallocated_amount = (frm.doc.base_received_amount + total_deductions + frm.doc.base_total_taxes_and_charges
 						- frm.doc.base_total_allocated_amount) / frm.doc.source_exchange_rate;
 			} else if (frm.doc.payment_type == "Pay"
 				&& frm.doc.base_total_allocated_amount < frm.doc.base_paid_amount - total_deductions
 				&& frm.doc.total_allocated_amount < frm.doc.received_amount + (total_deductions / frm.doc.target_exchange_rate)) {
-					unallocated_amount = (frm.doc.base_paid_amount + flt(frm.doc.base_total_taxes_and_charges) - (total_deductions
+					unallocated_amount = (frm.doc.base_paid_amount + frm.doc.base_total_taxes_and_charges - (total_deductions
 						+ frm.doc.base_total_allocated_amount)) / frm.doc.target_exchange_rate;
 			}
 		}
@@ -926,7 +907,7 @@ frappe.ui.form.on('Payment Entry', {
 			function(d) { return flt(d.amount) }));
 
 		frm.set_value("difference_amount", difference_amount - total_deductions +
-			flt(frm.doc.base_total_taxes_and_charges));
+			frm.doc.base_total_taxes_and_charges);
 
 		frm.events.hide_unhide_fields(frm);
 	},
@@ -992,48 +973,29 @@ frappe.ui.form.on('Payment Entry', {
 				},
 				callback: function(r, rt) {
 					if(r.message) {
-						const write_off_row = $.map(frm.doc["deductions"] || [], function(t) {
+						var write_off_row = $.map(frm.doc["deductions"] || [], function(t) {
 							return t.account==r.message[account] ? t : null; });
 
-						const difference_amount = flt(frm.doc.difference_amount,
+						var row = [];
+
+						var difference_amount = flt(frm.doc.difference_amount,
 							precision("difference_amount"));
 
-						const add_deductions = (details) => {
-							let row = null;
-							if (!write_off_row.length && difference_amount) {
-								row = frm.add_child("deductions");
-								row.account = details[account];
-								row.cost_center = details["cost_center"];
-							} else {
-								row = write_off_row[0];
-							}
-
-							if (row) {
-								row.amount = flt(row.amount) + difference_amount;
-							} else {
-								frappe.msgprint(__("No gain or loss in the exchange rate"))
-							}
-							refresh_field("deductions");
-						};
-
-						if (!r.message[account]) {
-							frappe.prompt({
-								label: __("Please Specify Account"),
-								fieldname: account,
-								fieldtype: "Link",
-								options: "Account",
-								get_query: () => ({
-									filters: {
-										company: frm.doc.company,
-									}
-								})
-							}, (values) => {
-								const details = Object.assign({}, r.message, values);
-								add_deductions(details);
-							}, __(frappe.unscrub(account)));
+						if (!write_off_row.length && difference_amount) {
+							row = frm.add_child("deductions");
+							row.account = r.message[account];
+							row.cost_center = r.message["cost_center"];
 						} else {
-							add_deductions(r.message);
+							row = write_off_row[0];
 						}
+
+						if (row) {
+							row.amount = flt(row.amount) + difference_amount;
+						} else {
+							frappe.msgprint(__("No gain or loss in the exchange rate"))
+						}
+
+						refresh_field("deductions");
 
 						frm.events.set_unallocated_amount(frm);
 					}

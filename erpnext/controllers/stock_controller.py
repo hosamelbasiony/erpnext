@@ -201,12 +201,6 @@ class StockController(AccountsController):
 					warehouse_asset_account = warehouse_account[item_row.get("warehouse")]["account"]
 
 				expense_account = frappe.get_cached_value("Company", self.company, "default_expense_account")
-				if not expense_account:
-					frappe.throw(
-						_(
-							"Please set default cost of goods sold account in company {0} for booking rounding gain and loss during stock transfer"
-						).format(frappe.bold(self.company))
-					)
 
 				gl_list.append(
 					self.get_gl_dict(
@@ -335,10 +329,9 @@ class StockController(AccountsController):
 		"""Create batches if required. Called before submit"""
 		for d in self.items:
 			if d.get(warehouse_field) and not d.batch_no:
-				has_batch_no, create_new_batch = frappe.get_cached_value(
+				has_batch_no, create_new_batch = frappe.db.get_value(
 					"Item", d.item_code, ["has_batch_no", "create_new_batch"]
 				)
-
 				if has_batch_no and create_new_batch:
 					d.batch_no = (
 						frappe.get_doc(
@@ -421,7 +414,7 @@ class StockController(AccountsController):
 				"voucher_no": self.name,
 				"voucher_detail_no": d.name,
 				"actual_qty": (self.docstatus == 1 and 1 or -1) * flt(d.get("stock_qty")),
-				"stock_uom": frappe.get_cached_value(
+				"stock_uom": frappe.db.get_value(
 					"Item", args.get("item_code") or d.get("item_code"), "stock_uom"
 				),
 				"incoming_rate": 0,
@@ -448,43 +441,7 @@ class StockController(AccountsController):
 			if not dimension:
 				continue
 
-			if self.doctype in [
-				"Purchase Invoice",
-				"Purchase Receipt",
-				"Sales Invoice",
-				"Delivery Note",
-				"Stock Entry",
-			]:
-				if (
-					(
-						sl_dict.actual_qty > 0
-						and not self.get("is_return")
-						or sl_dict.actual_qty < 0
-						and self.get("is_return")
-					)
-					and self.doctype in ["Purchase Invoice", "Purchase Receipt"]
-				) or (
-					(
-						sl_dict.actual_qty < 0
-						and not self.get("is_return")
-						or sl_dict.actual_qty > 0
-						and self.get("is_return")
-					)
-					and self.doctype in ["Sales Invoice", "Delivery Note", "Stock Entry"]
-				):
-					sl_dict[dimension.target_fieldname] = row.get(dimension.source_fieldname)
-				else:
-					fieldname_start_with = "to"
-					if self.doctype in ["Purchase Invoice", "Purchase Receipt"]:
-						fieldname_start_with = "from"
-
-					fieldname = f"{fieldname_start_with}_{dimension.source_fieldname}"
-					sl_dict[dimension.target_fieldname] = row.get(fieldname)
-
-					if not sl_dict.get(dimension.target_fieldname):
-						sl_dict[dimension.target_fieldname] = row.get(dimension.source_fieldname)
-
-			elif row.get(dimension.source_fieldname):
+			if row.get(dimension.source_fieldname):
 				sl_dict[dimension.target_fieldname] = row.get(dimension.source_fieldname)
 
 			if not sl_dict.get(dimension.target_fieldname) and dimension.fetch_from_parent:
@@ -652,7 +609,7 @@ class StockController(AccountsController):
 	def validate_customer_provided_item(self):
 		for d in self.get("items"):
 			# Customer Provided parts will have zero valuation rate
-			if frappe.get_cached_value("Item", d.item_code, "is_customer_provided_item"):
+			if frappe.db.get_value("Item", d.item_code, "is_customer_provided_item"):
 				d.allow_zero_valuation_rate = 1
 
 	def set_rate_of_stock_uom(self):
@@ -765,7 +722,7 @@ class StockController(AccountsController):
 		message += _("Please adjust the qty or edit {0} to proceed.").format(rule_link)
 		return message
 
-	def repost_future_sle_and_gle(self, force=False):
+	def repost_future_sle_and_gle(self):
 		args = frappe._dict(
 			{
 				"posting_date": self.posting_date,
@@ -776,10 +733,7 @@ class StockController(AccountsController):
 			}
 		)
 
-		if self.docstatus == 2:
-			force = True
-
-		if force or future_sle_exists(args) or repost_required_for_queue(self):
+		if future_sle_exists(args) or repost_required_for_queue(self):
 			item_based_reposting = cint(
 				frappe.db.get_single_value("Stock Reposting Settings", "item_based_reposting")
 			)
@@ -905,8 +859,6 @@ def is_reposting_pending():
 
 def future_sle_exists(args, sl_entries=None):
 	key = (args.voucher_type, args.voucher_no)
-	if not hasattr(frappe.local, "future_sle"):
-		frappe.local.future_sle = {}
 
 	if validate_future_sle_not_exists(args, key, sl_entries):
 		return False
@@ -951,9 +903,6 @@ def validate_future_sle_not_exists(args, key, sl_entries=None):
 		item_key = (args.get("item_code"), args.get("warehouse"))
 
 	if not sl_entries and hasattr(frappe.local, "future_sle"):
-		if key not in frappe.local.future_sle:
-			return False
-
 		if not frappe.local.future_sle.get(key) or (
 			item_key and item_key not in frappe.local.future_sle.get(key)
 		):
@@ -961,6 +910,9 @@ def validate_future_sle_not_exists(args, key, sl_entries=None):
 
 
 def get_cached_data(args, key):
+	if not hasattr(frappe.local, "future_sle"):
+		frappe.local.future_sle = {}
+
 	if key not in frappe.local.future_sle:
 		frappe.local.future_sle[key] = frappe._dict({})
 

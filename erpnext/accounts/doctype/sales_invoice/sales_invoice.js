@@ -93,12 +93,9 @@ erpnext.accounts.SalesInvoiceController = class SalesInvoiceController extends e
 
 		if (doc.docstatus == 1 && doc.outstanding_amount!=0
 			&& !(cint(doc.is_return) && doc.return_against)) {
-			this.frm.add_custom_button(
-				__('Payment'),
-				() => this.make_payment_entry(),
-				__('Create')
-			);
-			this.frm.page.set_inner_btn_group_as_primary(__('Create'));
+			cur_frm.add_custom_button(__('Payment'),
+				this.make_payment_entry, __('Create'));
+			cur_frm.page.set_inner_btn_group_as_primary(__('Create'));
 		}
 
 		if(doc.docstatus==1 && !doc.is_return) {
@@ -334,7 +331,6 @@ erpnext.accounts.SalesInvoiceController = class SalesInvoiceController extends e
 	}
 
 	make_inter_company_invoice() {
-		let me = this;
 		frappe.model.open_mapped_doc({
 			method: "erpnext.accounts.doctype.sales_invoice.sales_invoice.make_inter_company_purchase_invoice",
 			frm: me.frm
@@ -670,6 +666,19 @@ frappe.ui.form.on('Sales Invoice', {
 			}
 		}
 
+		// expense account
+		frm.fields_dict['items'].grid.get_field('expense_account').get_query = function(doc) {
+			if (erpnext.is_perpetual_inventory_enabled(doc.company)) {
+				return {
+					filters: {
+						'report_type': 'Profit and Loss',
+						'company': doc.company,
+						"is_group": 0
+					}
+				}
+			}
+		}
+
 		// discount account
 		frm.fields_dict['items'].grid.get_field('discount_account').get_query = function(doc) {
 			return {
@@ -887,8 +896,6 @@ frappe.ui.form.on('Sales Invoice', {
 				frm.events.append_time_log(frm, timesheet, 1.0);
 			}
 		});
-		frm.refresh_field("timesheets");
-		frm.trigger("calculate_timesheet_totals");
 	},
 
 	async get_exchange_rate(frm, from_currency, to_currency) {
@@ -928,6 +935,9 @@ frappe.ui.form.on('Sales Invoice', {
 		row.billing_amount = flt(time_log.billing_amount) * flt(exchange_rate);
 		row.timesheet_detail = time_log.name;
 		row.project_name = time_log.project_name;
+
+		frm.refresh_field("timesheets");
+		frm.trigger("calculate_timesheet_totals");
 	},
 
 	calculate_timesheet_totals: function(frm) {
