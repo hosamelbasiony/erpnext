@@ -197,7 +197,30 @@ class PaymentEntry(AccountsController):
 			# The reference has already been partly paid
 			elif latest.outstanding_amount < latest.invoice_amount and flt(
 				d.outstanding_amount, d.precision("outstanding_amount")
-			) != flt(latest.outstanding_amount, d.precision("outstanding_amount")):
+			) != flt(latest.outstanding_amount, d.precision("outstanding_amount")): 
+
+				print("######################################################")
+				print(d.reg_id)
+
+				# ########################################################
+				# add to processing queue
+				# ########################################################
+				
+				reg_code = d.reg_id
+				
+				if not frappe.db.exists("Processing Sync Object", reg_code):
+				    item = {
+				        "doctype": "Processing Sync Object",
+				        "owner": "Administrator",
+				        "modified_by": "Administrator",
+				        "lab_id": reg_code,
+				        "name": reg_code
+				    }
+
+				    doc_reg = frappe.get_doc(item)
+				    doc_reg.insert()
+
+				# ########################################################
 
 				frappe.throw(
 					_(
