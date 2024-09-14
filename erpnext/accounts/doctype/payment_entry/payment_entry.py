@@ -199,14 +199,14 @@ class PaymentEntry(AccountsController):
 				d.outstanding_amount, d.precision("outstanding_amount")
 			) != flt(latest.outstanding_amount, d.precision("outstanding_amount")): 
 
-				print("######################################################")
-				print(d.reg_id)
+				# print("######################################################")
+				# print(d.reg_id)
 
-				# ########################################################
-				# add to processing queue
-				# ########################################################
+				# # ########################################################
+				# # add to processing queue
+				# # ########################################################
 				
-				reg_code = d.reg_id
+				# reg_code = d.reg_id
 				
 				if not frappe.db.exists("Processing Sync Object", reg_code):
 				    item = {
